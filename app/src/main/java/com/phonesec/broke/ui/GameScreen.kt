@@ -59,10 +59,9 @@ import com.phonesec.broke.game.DayReport
 import com.phonesec.broke.game.Drain
 import com.phonesec.broke.game.GameState
 import com.phonesec.broke.game.GameStatus
+import com.phonesec.broke.game.Hints
 import com.phonesec.broke.game.LogEntry
 import com.phonesec.broke.game.asEuro
-import com.phonesec.broke.game.asPercent
-import com.phonesec.broke.game.format1
 
 @Composable
 fun GameScreen(viewModel: GameViewModel) {
@@ -103,10 +102,10 @@ private fun RunningGame(viewModel: GameViewModel, state: GameState) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Tag ${state.day}", fontWeight = FontWeight.Bold)
+                        Text("Tag ${state.day}", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                         Text(
-                            "Rekord: Tag ${state.bestDay}",
-                            style = MaterialTheme.typography.labelSmall,
+                            "Bester Tag bisher: ${state.bestDay}",
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -117,7 +116,7 @@ private fun RunningGame(viewModel: GameViewModel, state: GameState) {
                         onClick = viewModel::restartTutorial,
                         modifier = Modifier.testTag("help"),
                     ) {
-                        Text("?", fontWeight = FontWeight.Bold)
+                        Text("?", fontWeight = FontWeight.Bold, fontSize = 22.sp)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -125,36 +124,34 @@ private fun RunningGame(viewModel: GameViewModel, state: GameState) {
                 ),
             )
         },
-        bottomBar = {
-            EndDayBar(state = state, onEndDay = viewModel::endDay)
-        },
+        bottomBar = { EndDayBar(state = state, onEndDay = viewModel::endDay) },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            BalanceCard(state)
+            MoneyCard(state)
 
             TabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.background) {
                 Tab(
                     selected = tab == 0,
                     onClick = { chosenTab = 0 },
-                    text = { Text("Kosten") },
+                    text = { Text("Ausgaben", fontSize = 13.sp) },
                     modifier = Modifier.testTag("tab-kosten"),
                 )
                 Tab(
                     selected = tab == 1,
                     onClick = { chosenTab = 1 },
-                    text = { Text("Anlagen") },
+                    text = { Text("Anlegen", fontSize = 13.sp) },
                     modifier = Modifier.testTag("tab-anlagen"),
                 )
                 Tab(
                     selected = tab == 2,
                     onClick = { chosenTab = 2 },
-                    text = { Text("Ausbau") },
+                    text = { Text("Extras", fontSize = 13.sp) },
                     modifier = Modifier.testTag("tab-ausbau"),
                 )
                 Tab(
                     selected = tab == 3,
                     onClick = { chosenTab = 3 },
-                    text = { Text("Verlauf") },
+                    text = { Text("Verlauf", fontSize = 13.sp) },
                     modifier = Modifier.testTag("tab-verlauf"),
                 )
             }
@@ -192,57 +189,59 @@ private fun RunningGame(viewModel: GameViewModel, state: GameState) {
 private fun ActionPointDots(points: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(end = 16.dp),
+        modifier = Modifier.padding(end = 4.dp),
     ) {
         Text(
-            "Aktionen",
+            "Du kannst noch",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.width(8.dp))
-        repeat(points.coerceAtMost(6)) {
-            Box(
-                Modifier
-                    .padding(horizontal = 2.dp)
-                    .size(10.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-            )
-        }
+        Spacer(Modifier.width(6.dp))
         if (points == 0) {
-            Text("—", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+            Text("nichts", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+        } else {
+            repeat(points.coerceAtMost(6)) {
+                Box(
+                    Modifier
+                        .padding(horizontal = 2.dp)
+                        .size(12.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                )
+            }
         }
     }
 }
 
+/** Die Kopfkarte: erst wie viel Geld da ist, dann ob der Tag reicht, dann warum. */
 @Composable
-private fun BalanceCard(state: GameState) {
+private fun MoneyCard(state: GameState) {
     val progress = if (state.goal <= 0) 1f else {
         (state.projectedWorth.toFloat() / state.goal.toFloat()).coerceIn(0f, 1f)
     }
-    val barColor by animateColorAsState(
+    val statusColor by animateColorAsState(
         if (state.onTrack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-        label = "goalBar",
+        label = "status",
     )
 
     Card(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.padding(18.dp)) {
             Text(
-                "Vermögen",
-                style = MaterialTheme.typography.labelMedium,
+                "Dein Geld",
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 state.netWorth.asEuro(),
-                fontSize = 34.sp,
+                fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
             )
             Text(
-                "davon ${state.cash.asEuro()} liquide auf dem Konto",
-                style = MaterialTheme.typography.labelSmall,
+                "davon ${state.cash.asEuro()} auf dem Konto",
+                style = MaterialTheme.typography.labelMedium,
                 color = if (state.projectedCash < 0) {
                     MaterialTheme.colorScheme.error
                 } else {
@@ -250,85 +249,79 @@ private fun BalanceCard(state: GameState) {
                 },
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Tagesziel (Vermögen)", style = MaterialTheme.typography.labelMedium)
-                Text(
-                    state.goal.asEuro(),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
+            Text(
+                if (state.onTrack) "Heute schaffst du es" else "Heute reicht es noch nicht",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = statusColor,
+            )
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(8.dp),
-                color = barColor,
+                modifier = Modifier.fillMaxWidth().height(12.dp),
+                color = statusColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                if (state.onTrack) {
-                    "Heute Abend ${state.projectedWorth.asEuro()} — Ziel geschafft"
-                } else {
-                    "Heute Abend ${state.projectedWorth.asEuro()} — es fehlen ${state.shortfall.asEuro()}"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = barColor,
+                "Heute brauchst du ${state.goal.asEuro()}. " +
+                    "Am Abend hast du ${state.projectedWorth.asEuro()}.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(Modifier.height(12.dp))
 
-            MoneyRow("Zinsen (${state.baseInterest.asPercent()})", state.passiveIncome, positive = true)
-            MoneyRow("Anlagen", state.assetIncome, positive = true)
-            if (state.bonusIncome > 0) {
-                MoneyRow("Nebenjob (heute)", state.bonusIncome, positive = true)
-            }
-            MoneyRow("Steuern", -state.taxCost, positive = false)
-            MoneyRow("Fixkosten & Abos", -state.fixedCost, positive = false)
-
-            Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(Modifier.height(8.dp))
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Netto pro Tag", fontWeight = FontWeight.Bold)
-                Text(
-                    state.netIncome.asEuro(),
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (state.netIncome >= 0) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
-                )
-            }
+            BigMoneyRow("Heute kommt rein", state.grossIncome, good = true)
+            BigMoneyRow("Heute geht raus", -state.totalDrain, good = false)
+            Spacer(Modifier.height(4.dp))
+            BigMoneyRow("Das bleibt übrig", state.netIncome, good = state.netIncome >= 0, bold = true)
         }
     }
 }
 
 @Composable
-private fun MoneyRow(label: String, amount: Long, positive: Boolean) {
+private fun BigMoneyRow(label: String, amount: Long, good: Boolean, bold: Boolean = false) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(vertical = 3.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = if (bold) 16.sp else 15.sp,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+            color = if (bold) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         )
         Text(
             amount.asEuro(),
-            style = MaterialTheme.typography.bodySmall,
+            fontSize = if (bold) 16.sp else 15.sp,
             fontFamily = FontFamily.Monospace,
-            color = if (positive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            fontWeight = FontWeight.Bold,
+            color = if (good) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
         )
+    }
+}
+
+/** Der Satz, der sagt, was jetzt zu tun ist — das eigentliche Hilfsmittel für Anfänger. */
+@Composable
+private fun HintCard(state: GameState) {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("hint"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Tipp", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(12.dp))
+            Text(Hints.forState(state), fontSize = 14.sp)
+        }
     }
 }
 
@@ -341,17 +334,16 @@ private fun DrainList(
 ) {
     LazyColumn(
         modifier = Modifier.testTag("drain-list"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item { HintCard(state) }
         item {
-            OutlinedButton(
-                onClick = onSideGig,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = state.actionPoints > 0,
-            ) {
-                Text("Nebenjob annehmen (1 Aktion)")
-            }
+            Text(
+                "Das nimmt dir jeden Tag Geld weg:",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         items(state.drains, key = { it.id }) { drain ->
             DrainCard(
@@ -362,6 +354,15 @@ private fun DrainList(
                 onCancel = { onCancel(drain.id) },
                 onNegotiate = { onNegotiate(drain.id) },
             )
+        }
+        item {
+            OutlinedButton(
+                onClick = onSideGig,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                enabled = state.actionPoints > 0,
+            ) {
+                Text("Arbeiten gehen (bringt heute Geld)", fontSize = 14.sp)
+            }
         }
     }
 }
@@ -385,14 +386,14 @@ private fun DrainCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(drain.name, fontWeight = FontWeight.SemiBold)
+                    Text(drain.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(
                         if (drain.isTax) {
-                            "${drain.type.label} · ${drain.incomeRate.asPercent()} der Einnahmen"
+                            "Der Staat nimmt sich einen Teil von allem, was du verdienst."
                         } else {
-                            drain.type.label
+                            "Das kostet dich jeden Tag."
                         },
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -400,43 +401,57 @@ private fun DrainCard(
                     "-${drain.costFor(gross).asEuro()}",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
 
             if (locked) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    "Mindestlaufzeit bis Tag ${drain.lockedUntilDay}",
-                    style = MaterialTheme.typography.labelSmall,
+                    "Das kannst du erst ab Tag ${drain.lockedUntilDay} loswerden.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+            if (!drain.cancellable) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Das wirst du nie ganz los — nur billiger machen.",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
                 )
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = onNegotiate,
                     enabled = actionsLeft > 0,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).height(48.dp),
                 ) {
-                    Text("Verhandeln ${(drain.negotiationChance * 100).format1()} %", fontSize = 12.sp)
+                    Text("Billiger machen", fontSize = 13.sp)
                 }
                 Button(
                     onClick = onCancel,
                     enabled = drain.cancellable && !locked && actionsLeft > 0,
-                    modifier = Modifier.weight(1f).testTag("cancel-${drain.id}"),
+                    modifier = Modifier.weight(1f).height(48.dp).testTag("cancel-${drain.id}"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = Color.White,
                     ),
                 ) {
                     Text(
-                        if (drain.cancelFee > 0) "Kündigen ${drain.cancelFee.asEuro()}" else "Kündigen",
-                        fontSize = 12.sp,
+                        if (drain.cancelFee > 0) "Weg damit (${drain.cancelFee.asEuro()})" else "Weg damit",
+                        fontSize = 13.sp,
                     )
                 }
             }
+            Text(
+                Hints.chanceWord(drain.negotiationChance),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -445,13 +460,15 @@ private fun DrainCard(
 private fun AssetList(state: GameState, onBuy: (String) -> Unit, onSell: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.testTag("asset-list"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item { HintCard(state) }
         item {
             Text(
-                "Angelegt: ${state.investedValue.asEuro()} · liquide: ${state.cash.asEuro()}",
-                style = MaterialTheme.typography.bodySmall,
+                "Hier arbeitet dein Geld für dich. Aber pass auf: " +
+                    "Was du anlegst, liegt nicht mehr auf dem Konto.",
+                fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -476,77 +493,76 @@ private fun AssetCard(
     onSell: () -> Unit,
 ) {
     val affordable = cash >= asset.nextPrice
+    // Was ein einzelnes Stück täglich abwirft — greifbarer als eine Prozentzahl.
+    val perUnit = (asset.nextPrice * asset.dailyYield * yieldMultiplier).toLong()
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(asset.name, fontWeight = FontWeight.SemiBold)
+                Text(asset.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 if (asset.owned > 0) {
                     Text(
-                        "${asset.owned}×",
+                        "${asset.owned} Stück",
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                     )
                 }
             }
+
             Text(
                 asset.description,
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    "Rendite ${(asset.dailyYield * yieldMultiplier).asPercent()}/Tag",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    "Risiko ${asset.risk.asPercent()}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (asset.risk > 0.2) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-
+            Spacer(Modifier.height(6.dp))
             Text(
-                if (asset.sellRate >= 1.0) {
-                    "Verkauf: voll auszahlbar"
+                "Bringt dir ${perUnit.asEuro()} am Tag.",
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                Hints.riskWord(asset.risk),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (asset.risk > 0.2) {
+                    MaterialTheme.colorScheme.error
                 } else {
-                    "Verkauf: nur ${(asset.sellRate * 100).format1()} % zurück"
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                style = MaterialTheme.typography.labelSmall,
+            )
+            Text(
+                Hints.sellWord(asset.sellRate),
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             if (asset.owned > 0) {
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    "bringt aktuell ${(asset.dailyIncome() * yieldMultiplier).toLong().asEuro()}/Tag",
-                    style = MaterialTheme.typography.labelSmall,
+                    "Deine bringen zusammen " +
+                        "${(asset.dailyIncome() * yieldMultiplier).toLong().asEuro()} am Tag.",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onBuy,
                     enabled = affordable,
-                    modifier = Modifier.weight(1f).testTag("buy-${asset.id}"),
+                    modifier = Modifier.weight(1f).height(48.dp).testTag("buy-${asset.id}"),
                 ) {
-                    Text("Kaufen ${asset.nextPrice.asEuro()}", fontSize = 12.sp)
+                    Text("Kaufen ${asset.nextPrice.asEuro()}", fontSize = 13.sp)
                 }
                 if (asset.owned > 0) {
                     OutlinedButton(
                         onClick = onSell,
-                        modifier = Modifier.weight(1f).testTag("sell-${asset.id}"),
+                        modifier = Modifier.weight(1f).height(48.dp).testTag("sell-${asset.id}"),
                     ) {
-                        Text("Verkaufen ${asset.sellValue.asEuro()}", fontSize = 12.sp)
+                        Text("Verkaufen ${asset.sellValue.asEuro()}", fontSize = 13.sp)
                     }
                 }
             }
@@ -558,14 +574,14 @@ private fun AssetCard(
 private fun UpgradeList(state: GameState, onBuy: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.testTag("upgrade-list"),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
             Text(
-                "Ausbauten bringen keine Rendite — sie ändern die Regeln. " +
-                    "Dasselbe Geld könnte auch als Anlage arbeiten.",
-                style = MaterialTheme.typography.bodySmall,
+                "Extras bringen dir kein Geld. Sie machen das Spiel für dich leichter. " +
+                    "Dein Geld bleibt dabei erhalten.",
+                fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -573,29 +589,31 @@ private fun UpgradeList(state: GameState, onBuy: (String) -> Unit) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(14.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(upgrade.name, fontWeight = FontWeight.SemiBold)
+                        Text(upgrade.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         if (upgrade.owned) {
                             Text(
-                                "aktiv",
+                                "hast du",
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.labelMedium,
                             )
                         }
                     }
                     Text(
                         upgrade.description,
-                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (!upgrade.owned) {
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(12.dp))
                         Button(
                             onClick = { onBuy(upgrade.id) },
                             enabled = state.cash >= upgrade.price,
-                            modifier = Modifier.fillMaxWidth().testTag("upgrade-${upgrade.id}"),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("upgrade-${upgrade.id}"),
                         ) {
-                            Text("Kaufen für ${upgrade.price.asEuro()}")
+                            Text("Kaufen ${upgrade.price.asEuro()}", fontSize = 14.sp)
                         }
                     }
                 }
@@ -613,21 +631,21 @@ private fun LogList(log: List<LogEntry>) {
 
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(log) { entry ->
             Row {
                 Text(
-                    "T${entry.day}",
+                    "Tag ${entry.day}",
                     fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(40.dp),
+                    modifier = Modifier.width(64.dp),
                 )
                 Text(
                     entry.text,
-                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 13.sp,
                     color = when (entry.tone) {
                         LogEntry.Tone.GOOD -> MaterialTheme.colorScheme.primary
                         LogEntry.Tone.BAD -> MaterialTheme.colorScheme.error
@@ -644,16 +662,16 @@ private fun EndDayBar(state: GameState, onEndDay: () -> Unit) {
     Column(
         Modifier
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
+            .padding(12.dp)
     ) {
         if (!state.onTrack) {
             Text(
                 if (state.projectedCash < 0) {
-                    "Achtung: dein Konto läuft heute leer."
+                    "Wenn du jetzt aufhörst, ist dein Konto leer."
                 } else {
-                    "Achtung: so wie es jetzt steht, verlierst du heute."
+                    "Wenn du jetzt aufhörst, verlierst du."
                 },
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
@@ -662,10 +680,10 @@ private fun EndDayBar(state: GameState, onEndDay: () -> Unit) {
         }
         Button(
             onClick = onEndDay,
-            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("end-day"),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(60.dp).testTag("end-day"),
+            shape = RoundedCornerShape(16.dp),
         ) {
-            Text("Tag ${state.day} abschließen", fontWeight = FontWeight.Bold)
+            Text("Tag ${state.day} fertig", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
     }
 }
@@ -676,37 +694,29 @@ private fun DayReportDialog(report: DayReport, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Weiter") } },
-        title = { Text("Tag ${report.day} abgerechnet") },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Weiter", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        title = { Text("Tag ${report.day} geschafft!", fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                MoneyRow("Einnahmen", report.gross, positive = true)
-                MoneyRow("Steuern", -report.taxes, positive = false)
-                MoneyRow("Fixkosten", -report.fixed, positive = false)
-                Spacer(Modifier.height(8.dp))
+                BigMoneyRow("Reingekommen", report.gross, good = true)
+                BigMoneyRow("Rausgegangen", -(report.taxes + report.fixed), good = false)
+                Spacer(Modifier.height(10.dp))
                 HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Vermögen (Ziel ${report.goal.asEuro()})", fontWeight = FontWeight.Bold)
-                    Text(
-                        report.worthAfter.asEuro(),
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        "Netto heute",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        report.net.asEuro(),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Du hast jetzt ${report.worthAfter.asEuro()}.",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Gebraucht hättest du ${report.goal.asEuro()}.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         },
     )
@@ -718,47 +728,52 @@ private fun GameOverScreen(state: GameState, onRestart: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(32.dp),
+            .padding(28.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 "BROKE",
-                fontSize = 56.sp,
+                fontSize = 60.sp,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.error,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             Text(
                 if (state.cash < 0) {
-                    "An Tag ${state.day} war dein Konto leer — Rechnungen unbezahlbar."
+                    "An Tag ${state.day} war dein Konto leer. Du konntest nichts mehr bezahlen."
                 } else {
-                    "Du hast das Tagesziel an Tag ${state.day} verfehlt."
+                    "An Tag ${state.day} hattest du zu wenig Geld."
                 },
+                fontSize = 16.sp,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(24.dp))
             Text(
-                state.netWorth.asEuro(),
-                fontSize = 28.sp,
+                "Du hattest ${state.netWorth.asEuro()}",
+                fontSize = 20.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "gebraucht hättest du ${state.goal.asEuro()}",
-                style = MaterialTheme.typography.bodySmall,
+                "Gebraucht hättest du ${state.goal.asEuro()}",
+                fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(32.dp))
-            Text("Rekord: Tag ${state.bestDay}", color = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.height(28.dp))
+            Text(
+                "Dein bester Tag: ${state.bestDay}",
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.secondary,
+            )
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = onRestart,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(60.dp),
+                shape = RoundedCornerShape(16.dp),
             ) {
-                Text("Nochmal", fontWeight = FontWeight.Bold)
+                Text("Nochmal", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
         }
     }
@@ -780,8 +795,8 @@ private fun TutorialOverlay(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .padding(24.dp),
+            .background(Color.Black.copy(alpha = 0.75f))
+            .padding(20.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Card(
@@ -790,16 +805,16 @@ private fun TutorialOverlay(
         ) {
             Column(Modifier.padding(20.dp)) {
                 Text(
-                    "Schritt ${index + 1} von $total",
-                    style = MaterialTheme.typography.labelSmall,
+                    "${index + 1} von $total",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(step.title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Text(step.body, style = MaterialTheme.typography.bodyMedium)
+                Text(step.title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
+                Text(step.body, fontSize = 16.sp)
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(18.dp))
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -808,8 +823,15 @@ private fun TutorialOverlay(
                     TextButton(onClick = onSkip, modifier = Modifier.testTag("tutorial-skip")) {
                         Text("Überspringen")
                     }
-                    Button(onClick = onNext, modifier = Modifier.testTag("tutorial-next")) {
-                        Text(if (index + 1 >= total) "Los geht's" else "Weiter")
+                    Button(
+                        onClick = onNext,
+                        modifier = Modifier.height(50.dp).testTag("tutorial-next"),
+                    ) {
+                        Text(
+                            if (index + 1 >= total) "Los geht's" else "Weiter",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }

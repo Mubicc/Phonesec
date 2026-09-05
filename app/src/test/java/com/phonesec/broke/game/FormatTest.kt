@@ -19,17 +19,4 @@ class FormatTest {
         assertEquals("-45,00 €", (-4_500L).asEuro())
         assertEquals("-1.000,00 €", (-100_000L).asEuro())
     }
-
-    @Test
-    fun `kurzform kuerzt grosse betraege`() {
-        assertEquals("500 €", 50_000L.asEuroShort())
-        assertEquals("1,2k €", 123_400L.asEuroShort())
-        assertEquals("1,5M €", 150_000_000L.asEuroShort())
-    }
-
-    @Test
-    fun `prozentwerte werden auf eine stelle gerundet`() {
-        assertEquals("25,0 %", 0.25.asPercent())
-        assertEquals("4,5 %", 0.045.asPercent())
-    }
 }

@@ -41,14 +41,14 @@ object Balancing {
     fun startingDrains(): List<Drain> = listOf(
         Drain(
             id = "miete",
-            name = "WG-Zimmer",
+            name = "Miete für dein Zimmer",
             type = DrainType.FIXKOSTEN,
             dailyCost = 4_500L,
             cancellable = false,
         ),
         Drain(
             id = "steuer",
-            name = "Einkommensteuer",
+            name = "Steuern",
             type = DrainType.STEUER,
             incomeRate = 0.25,
             cancellable = false,
@@ -61,7 +61,7 @@ object Balancing {
         ),
         Drain(
             id = "gym",
-            name = "PumpHub Jahresvertrag",
+            name = "Fitnessstudio",
             type = DrainType.ABO,
             dailyCost = 130L,
             cancelFee = 2_500L,
@@ -85,7 +85,7 @@ object Balancing {
         Asset(
             id = "tagesgeld",
             name = "Tagesgeldkonto",
-            description = "Magere Rendite, aber jederzeit voll auszahlbar.",
+            description = "Wie ein Sparschwein bei der Bank.",
             basePrice = 50_000L,
             dailyYield = 0.065,
             risk = 0.0,
@@ -94,7 +94,7 @@ object Balancing {
         Asset(
             id = "etf",
             name = "ETF-Sparplan",
-            description = "Solide Rendite, gelegentlich rote Tage.",
+            description = "Du kaufst kleine Anteile an vielen Firmen.",
             basePrice = 150_000L,
             dailyYield = 0.12,
             risk = 0.15,
@@ -103,7 +103,7 @@ object Balancing {
         Asset(
             id = "krypto",
             name = "Krypto-Bag",
-            description = "Wilde Ausschläge. Beim Verkauf bleibt einiges liegen.",
+            description = "Digitales Geld. Mal geht es hoch, mal runter.",
             basePrice = 90_000L,
             dailyYield = 0.22,
             risk = 0.35,
@@ -112,7 +112,7 @@ object Balancing {
         Asset(
             id = "immo",
             name = "Eigentumswohnung",
-            description = "Beste Rendite — aber Grundsteuer und schwer verkäuflich.",
+            description = "Eine Wohnung, die du vermietest.",
             basePrice = 900_000L,
             dailyYield = 0.135,
             risk = 0.05,
@@ -124,31 +124,31 @@ object Balancing {
         Upgrade(
             id = "steuerberater",
             name = "Steuerberater",
-            description = "Halbiert den täglichen Anstieg deines Steuersatzes.",
+            description = "Die Steuern steigen nur noch halb so schnell.",
             price = 400_000L,
         ),
         Upgrade(
             id = "assistenz",
             name = "Assistenz",
-            description = "Eine zusätzliche Aktion an jedem Tag.",
+            description = "Du darfst jeden Tag eine Sache mehr machen.",
             price = 900_000L,
         ),
         Upgrade(
             id = "notgroschen",
             name = "Risikopuffer",
-            description = "Rote Tage kosten dich nur noch die Hälfte.",
+            description = "Schlechte Tage tun nur noch halb so weh.",
             price = 650_000L,
         ),
         Upgrade(
             id = "netzwerk",
             name = "Netzwerk",
-            description = "Verhandlungen gelingen deutlich häufiger.",
+            description = "\"Billiger machen\" klappt viel öfter.",
             price = 300_000L,
         ),
         Upgrade(
             id = "depot",
             name = "Depot-Optimierung",
-            description = "Alle Anlagen werfen 15 % mehr ab.",
+            description = "Alles, was du angelegt hast, bringt mehr Geld.",
             price = 1_500_000L,
         ),
     )
@@ -163,7 +163,7 @@ object Balancing {
         assets = startingAssets(),
         upgrades = startingUpgrades(),
         log = listOf(
-            LogEntry(1, "Tag 1. Erreiche das Tagesziel oder du bist raus.", LogEntry.Tone.NEUTRAL),
+            LogEntry(1, "Tag 1. Los geht's!", LogEntry.Tone.NEUTRAL),
         ),
     )
 }

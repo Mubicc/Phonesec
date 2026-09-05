@@ -43,7 +43,7 @@ class GameEngineTest {
     fun `kuendigen waehrend der mindestlaufzeit wird abgelehnt`() {
         val start = GameEngine.newGame()
         val reason = rejected(GameEngine.cancel(start, "gym"))
-        assertTrue(reason.contains("Mindestlaufzeit"))
+        assertTrue(reason.contains("erst ab Tag"))
     }
 
     @Test
@@ -56,8 +56,8 @@ class GameEngineTest {
     @Test
     fun `ohne aktionspunkte geht nichts mehr`() {
         val start = GameEngine.newGame().copy(actionPoints = 0)
-        assertTrue(rejected(GameEngine.cancel(start, "handy")).contains("Aktionen"))
-        assertTrue(rejected(GameEngine.sideGig(start, Random(1))).contains("Aktionen"))
+        assertTrue(rejected(GameEngine.cancel(start, "handy")).contains("nichts mehr machen"))
+        assertTrue(rejected(GameEngine.sideGig(start, Random(1))).contains("nichts mehr machen"))
     }
 
     @Test
@@ -122,7 +122,7 @@ class GameEngineTest {
     @Test
     fun `zu teure anlage wird abgelehnt`() {
         val broke = GameEngine.newGame().copy(cash = 100L)
-        assertTrue(rejected(GameEngine.buyAsset(broke, "immo")).contains("fehlt"))
+        assertTrue(rejected(GameEngine.buyAsset(broke, "immo")).contains("nicht genug Geld"))
     }
 
     @Test
@@ -249,7 +249,7 @@ class GameEngineTest {
 
     @Test
     fun `was man nicht besitzt kann man nicht verkaufen`() {
-        assertTrue(rejected(GameEngine.sellAsset(GameEngine.newGame(), "krypto")).contains("nichts"))
+        assertTrue(rejected(GameEngine.sellAsset(GameEngine.newGame(), "krypto")).contains("gar nicht"))
     }
 
     @Test

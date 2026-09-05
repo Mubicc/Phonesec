@@ -20,17 +20,17 @@ object GameEngine {
     /** Abo kündigen. Kostet ggf. eine Gebühr und ist während der Mindestlaufzeit gesperrt. */
     fun cancel(state: GameState, drainId: String): Outcome {
         val drain = state.drains.find { it.id == drainId }
-            ?: return Outcome.Rejected("Posten existiert nicht mehr.")
-        if (!drain.cancellable) return Outcome.Rejected("\"${drain.name}\" lässt sich nicht kündigen.")
+            ?: return Outcome.Rejected("Das gibt es nicht mehr.")
+        if (!drain.cancellable) return Outcome.Rejected("\"${drain.name}\" wirst du nicht los.")
         if (drain.isLocked(state.day)) {
-            return Outcome.Rejected("Mindestlaufzeit bis Tag ${drain.lockedUntilDay}.")
+            return Outcome.Rejected("Das geht erst ab Tag ${drain.lockedUntilDay}.")
         }
-        if (state.actionPoints < 1) return Outcome.Rejected("Keine Aktionen mehr heute.")
+        if (state.actionPoints < 1) return Outcome.Rejected("Heute kannst du nichts mehr machen.")
         if (state.cash < drain.cancelFee) {
-            return Outcome.Rejected("Kündigungsgebühr ${drain.cancelFee.asEuro()} nicht bezahlbar.")
+            return Outcome.Rejected("Dafür brauchst du ${drain.cancelFee.asEuro()} auf dem Konto.")
         }
 
-        val note = if (drain.cancelFee > 0) " (Gebühr ${drain.cancelFee.asEuro()})" else ""
+        val note = if (drain.cancelFee > 0) " Hat ${drain.cancelFee.asEuro()} gekostet." else ""
         return Outcome.Ok(
             state.copy(
                 cash = state.cash - drain.cancelFee,
@@ -38,7 +38,7 @@ object GameEngine {
                 actionPoints = state.actionPoints - 1,
                 log = state.log + LogEntry(
                     state.day,
-                    "\"${drain.name}\" gekündigt$note.",
+                    "${drain.name} ist weg.$note",
                     LogEntry.Tone.GOOD,
                 ),
             )
@@ -52,7 +52,7 @@ object GameEngine {
     fun negotiate(state: GameState, drainId: String, rng: Random): Outcome {
         val drain = state.drains.find { it.id == drainId }
             ?: return Outcome.Rejected("Posten existiert nicht mehr.")
-        if (state.actionPoints < 1) return Outcome.Rejected("Keine Aktionen mehr heute.")
+        if (state.actionPoints < 1) return Outcome.Rejected("Heute kannst du nichts mehr machen.")
 
         val spent = state.copy(actionPoints = state.actionPoints - 1)
         val chance = if (state.hasUpgrade("netzwerk")) {
@@ -66,7 +66,7 @@ object GameEngine {
                     drains = spent.drains.map { if (it.id == drainId) it.bumpNegotiations() else it },
                     log = spent.log + LogEntry(
                         state.day,
-                        "Verhandlung bei \"${drain.name}\" gescheitert.",
+                        "Bei ${drain.name} hat es nicht geklappt.",
                         LogEntry.Tone.BAD,
                     ),
                 )
@@ -91,7 +91,7 @@ object GameEngine {
                 drains = spent.drains.map { if (it.id == drainId) updated else it },
                 log = spent.log + LogEntry(
                     state.day,
-                    "\"${drain.name}\" um ${(reduction * 100).format1()} % runtergehandelt.",
+                    "${drain.name} ist jetzt billiger.",
                     LogEntry.Tone.GOOD,
                 ),
             )
@@ -101,9 +101,9 @@ object GameEngine {
     /** Anteil einer Anlage kaufen. Kostet Geld, aber keine Aktion. */
     fun buyAsset(state: GameState, assetId: String): Outcome {
         val asset = state.assets.find { it.id == assetId }
-            ?: return Outcome.Rejected("Anlage unbekannt.")
+            ?: return Outcome.Rejected("Das gibt es nicht.")
         val price = asset.nextPrice
-        if (state.cash < price) return Outcome.Rejected("Dafür fehlt dir Geld.")
+        if (state.cash < price) return Outcome.Rejected("Dafür hast du nicht genug Geld.")
 
         val bought = asset.copy(owned = asset.owned + 1)
         var next = state.copy(
@@ -121,14 +121,14 @@ object GameEngine {
             next = next.copy(
                 drains = next.drains + Drain(
                     id = "grundsteuer",
-                    name = "Grundsteuer",
+                    name = "Steuer für die Wohnung",
                     type = DrainType.FIXKOSTEN,
                     dailyCost = 900L,
                     cancellable = false,
                 ),
                 log = next.log + LogEntry(
                     state.day,
-                    "Mit der Wohnung kommt die Grundsteuer: 9,00 €/Tag.",
+                    "Für die Wohnung zahlst du jetzt 9,00 € Steuer am Tag.",
                     LogEntry.Tone.BAD,
                 ),
             )
@@ -143,16 +143,12 @@ object GameEngine {
      */
     fun sellAsset(state: GameState, assetId: String): Outcome {
         val asset = state.assets.find { it.id == assetId }
-            ?: return Outcome.Rejected("Anlage unbekannt.")
-        if (asset.owned == 0) return Outcome.Rejected("Davon besitzt du nichts.")
+            ?: return Outcome.Rejected("Das gibt es nicht.")
+        if (asset.owned == 0) return Outcome.Rejected("Das hast du gar nicht.")
 
         val payout = asset.sellValue
         val sold = asset.copy(owned = asset.owned - 1)
-        val note = if (asset.sellRate < 1.0) {
-            " (${((1 - asset.sellRate) * 100).format1()} % Verlust)"
-        } else {
-            ""
-        }
+        val note = if (asset.sellRate < 1.0) " Etwas ist dabei verloren gegangen." else ""
 
         return Outcome.Ok(
             state.copy(
@@ -160,7 +156,7 @@ object GameEngine {
                 assets = state.assets.map { if (it.id == assetId) sold else it },
                 log = state.log + LogEntry(
                     state.day,
-                    "${asset.name} verkauft für ${payout.asEuro()}$note.",
+                    "${asset.name} verkauft. Du bekommst ${payout.asEuro()}.$note",
                     LogEntry.Tone.NEUTRAL,
                 ),
             )
@@ -170,16 +166,16 @@ object GameEngine {
     /** Dauerhaften Ausbau kaufen. Bringt keine Rendite, sondern ändert eine Regel. */
     fun buyUpgrade(state: GameState, upgradeId: String): Outcome {
         val upgrade = state.upgrades.find { it.id == upgradeId }
-            ?: return Outcome.Rejected("Ausbau unbekannt.")
-        if (upgrade.owned) return Outcome.Rejected("Hast du schon.")
-        if (state.cash < upgrade.price) return Outcome.Rejected("Dafür fehlt dir Geld.")
+            ?: return Outcome.Rejected("Das gibt es nicht.")
+        if (upgrade.owned) return Outcome.Rejected("Das hast du schon.")
+        if (state.cash < upgrade.price) return Outcome.Rejected("Dafür hast du nicht genug Geld.")
 
         val bought = state.copy(
             cash = state.cash - upgrade.price,
             upgrades = state.upgrades.map { if (it.id == upgradeId) it.copy(owned = true) else it },
             log = state.log + LogEntry(
                 state.day,
-                "${upgrade.name} gekauft: ${upgrade.description}",
+                "${upgrade.name} gekauft. ${upgrade.description}",
                 LogEntry.Tone.GOOD,
             ),
         )
@@ -194,7 +190,7 @@ object GameEngine {
      * schaffen ist. Wirkt nur einen Tag — als Dauerlösung taugt er nicht.
      */
     fun sideGig(state: GameState, rng: Random): Outcome {
-        if (state.actionPoints < 1) return Outcome.Rejected("Keine Aktionen mehr heute.")
+        if (state.actionPoints < 1) return Outcome.Rejected("Heute kannst du nichts mehr machen.")
 
         val base = (state.goal * 0.25).toLong().coerceAtLeast(5_000L)
         val payout = base + (base * rng.nextDouble()).toLong()
@@ -204,7 +200,7 @@ object GameEngine {
                 actionPoints = state.actionPoints - 1,
                 log = state.log + LogEntry(
                     state.day,
-                    "Nebenjob erledigt: +${payout.asEuro()} Einnahmen heute.",
+                    "Du warst arbeiten. Das bringt heute ${payout.asEuro()}.",
                     LogEntry.Tone.GOOD,
                 ),
             )
@@ -243,9 +239,9 @@ object GameEngine {
 
         if (!survived) {
             val reason = if (broke) {
-                "Konto leer: ${cashAfter.asEuro()}. Du kannst deine Rechnungen nicht mehr zahlen."
+                "Dein Konto ist leer. Du kannst nichts mehr bezahlen."
             } else {
-                "Tagesziel verfehlt: ${worthAfter.asEuro()} statt ${state.goal.asEuro()}."
+                "Zu wenig Geld: ${worthAfter.asEuro()} statt ${state.goal.asEuro()}."
             }
             val lost = state.copy(
                 cash = cashAfter,
@@ -266,7 +262,7 @@ object GameEngine {
             bestDay = maxOf(state.bestDay, state.day + 1),
             log = state.log + LogEntry(
                 state.day,
-                "Tag ${state.day} geschafft. Netto ${net.asEuro()}.",
+                "Tag ${state.day} geschafft. ${net.asEuro()} übrig geblieben.",
                 LogEntry.Tone.GOOD,
             ),
         )

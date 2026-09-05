@@ -33,7 +33,7 @@ object Events {
                 cancelFee = scaled * 4,
             )
             state.copy(drains = state.drains + drain) to
-                LogEntry(state.day, "Abofalle: \"$name\" läuft jetzt für ${scaled.asEuro()}/Tag.", LogEntry.Tone.BAD)
+                LogEntry(state.day, "Aufgepasst: \"$name\" kostet dich ab jetzt ${scaled.asEuro()} am Tag.", LogEntry.Tone.BAD)
         },
 
         GameEvent("Steuererhöhung", weight = 18, minDay = 3) { state, _ ->
@@ -41,7 +41,7 @@ object Events {
                 if (it.isTax) it.copy(incomeRate = (it.incomeRate + 0.04).coerceAtMost(0.75)) else it
             }
             state.copy(drains = updated) to
-                LogEntry(state.day, "Steuerreform: dein Steuersatz steigt um 4 Prozentpunkte.", LogEntry.Tone.BAD)
+                LogEntry(state.day, "Schlechte Nachricht: Du musst mehr Steuern zahlen.", LogEntry.Tone.BAD)
         },
 
         GameEvent("Inflation", weight = 16, minDay = 4) { state, _ ->
@@ -49,47 +49,47 @@ object Events {
                 if (it.isTax) it else it.copy(dailyCost = (it.dailyCost * 1.12).toLong())
             }
             state.copy(drains = updated) to
-                LogEntry(state.day, "Inflation: alle Fixkosten werden 12 % teurer.", LogEntry.Tone.BAD)
+                LogEntry(state.day, "Alles wird teurer. Deine Ausgaben steigen.", LogEntry.Tone.BAD)
         },
 
         GameEvent("Zinssenkung", weight = 14, minDay = 3) { state, _ ->
             val next = (state.baseInterest - 0.004).coerceAtLeast(Balancing.MIN_INTEREST)
             state.copy(baseInterest = next) to
-                LogEntry(state.day, "Die Bank senkt die Zinsen auf ${(next * 100).format1()} %.", LogEntry.Tone.BAD)
+                LogEntry(state.day, "Die Bank zahlt dir jetzt weniger für dein Geld auf dem Konto.", LogEntry.Tone.BAD)
         },
 
         GameEvent("Nachzahlung", weight = 12, minDay = 5) { state, rng ->
             val amount = (state.cash * (0.03 + rng.nextDouble() * 0.05)).toLong()
             state.copy(cash = state.cash - amount) to
-                LogEntry(state.day, "Steuernachzahlung: ${amount.asEuro()} weg.", LogEntry.Tone.BAD)
+                LogEntry(state.day, "Du musst Steuern nachzahlen: ${amount.asEuro()} weg.", LogEntry.Tone.BAD)
         },
 
         GameEvent("Steuerrückzahlung", weight = 12) { state, rng ->
             val amount = (state.cash * (0.02 + rng.nextDouble() * 0.04)).toLong()
             state.copy(cash = state.cash + amount) to
-                LogEntry(state.day, "Steuerrückzahlung: ${amount.asEuro()} zurück.", LogEntry.Tone.GOOD)
+                LogEntry(state.day, "Du bekommst Steuern zurück: ${amount.asEuro()}.", LogEntry.Tone.GOOD)
         },
 
         GameEvent("Kulanz", weight = 10, minDay = 4) { state, rng ->
             val cancellable = state.drains.filter { it.cancellable && !it.isTax }
             if (cancellable.isEmpty()) {
-                state to LogEntry(state.day, "Ruhiger Tag. Nichts passiert.", LogEntry.Tone.NEUTRAL)
+                state to LogEntry(state.day, "Ein ruhiger Tag. Nichts passiert.", LogEntry.Tone.NEUTRAL)
             } else {
                 val victim = cancellable.random(rng)
                 state.copy(drains = state.drains - victim) to
-                    LogEntry(state.day, "\"${victim.name}\" wurde vom Anbieter eingestellt. Glück gehabt.", LogEntry.Tone.GOOD)
+                    LogEntry(state.day, "${victim.name} gibt es nicht mehr. Glück gehabt!", LogEntry.Tone.GOOD)
             }
         },
 
         GameEvent("Zinsbonus", weight = 10) { state, _ ->
             val next = state.baseInterest + 0.005
             state.copy(baseInterest = next) to
-                LogEntry(state.day, "Bank-Aktion: Zinsen steigen auf ${(next * 100).format1()} %.", LogEntry.Tone.GOOD)
+                LogEntry(state.day, "Die Bank zahlt dir jetzt mehr für dein Geld auf dem Konto.", LogEntry.Tone.GOOD)
         },
 
         GameEvent("Extra-Tag", weight = 8, minDay = 3) { state, _ ->
             state.copy(actionPoints = state.actionPoints + 2) to
-                LogEntry(state.day, "Du hast dir freigenommen: +2 Aktionen heute.", LogEntry.Tone.GOOD)
+                LogEntry(state.day, "Du hast heute viel Zeit: Du darfst 2 Sachen mehr machen.", LogEntry.Tone.GOOD)
         },
     )
 

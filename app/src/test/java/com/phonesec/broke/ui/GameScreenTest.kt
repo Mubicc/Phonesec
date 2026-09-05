@@ -39,9 +39,9 @@ class GameScreenTest {
         launch()
 
         compose.onNodeWithText("Tag 1").assertIsDisplayed()
-        compose.onNodeWithText("Vermögen").assertIsDisplayed()
-        compose.onNodeWithText("WG-Zimmer").assertIsDisplayed()
-        compose.onNodeWithText("Einkommensteuer").assertIsDisplayed()
+        compose.onNodeWithText("Dein Geld").assertIsDisplayed()
+        compose.onNodeWithText("Miete für dein Zimmer").assertIsDisplayed()
+        compose.onNodeWithText("Steuern").assertIsDisplayed()
     }
 
     @Test
@@ -61,7 +61,7 @@ class GameScreenTest {
 
         compose.onNodeWithTag("end-day").performClick()
 
-        compose.onNodeWithText("Tag 1 abgerechnet").assertIsDisplayed()
+        compose.onNodeWithText("Tag 1 geschafft!").assertIsDisplayed()
         compose.onNodeWithText("Weiter").performClick()
         compose.onNodeWithText("Tag 2").assertIsDisplayed()
     }
@@ -101,14 +101,16 @@ class GameScreenTest {
         val viewModel = launch(tutorialSeen = false)
 
         compose.onNodeWithTag("tutorial-card").assertIsDisplayed()
-        compose.onNodeWithText("Worum es geht").assertIsDisplayed()
+        compose.onNodeWithText("Hallo!").assertIsDisplayed()
 
         compose.onNodeWithTag("tutorial-next").performClick()
-        compose.onNodeWithText("Das Tagesziel").assertIsDisplayed()
+        // Über den Fließtext prüfen: Die Überschrift "Dein Geld" steht auch auf der Geldkarte.
+        assertEquals(1, viewModel.tutorialStep)
+        compose.onNodeWithText(Tutorial.steps[1].body).assertIsDisplayed()
 
         // Ab dem Anlagen-Schritt muss auch der passende Tab zu sehen sein.
         while (viewModel.tutorialStep != null &&
-            Tutorial.steps[viewModel.tutorialStep!!].title != "Anlagen"
+            Tutorial.steps[viewModel.tutorialStep!!].title != "Geld anlegen"
         ) {
             compose.onNodeWithTag("tutorial-next").performClick()
         }
@@ -121,10 +123,11 @@ class GameScreenTest {
 
         compose.onNodeWithTag("tutorial-skip").performClick()
         assertNull(viewModel.tutorialStep)
-        compose.onAllNodesWithText("Worum es geht").assertCountEquals(0)
+        compose.onAllNodesWithText("Hallo!").assertCountEquals(0)
 
         compose.onNodeWithTag("help").performClick()
-        compose.onNodeWithText("Worum es geht").assertIsDisplayed()
+        assertEquals(0, viewModel.tutorialStep)
+        compose.onNodeWithText("Hallo!").assertIsDisplayed()
     }
 
     @Test
@@ -151,6 +154,6 @@ class GameScreenTest {
         compose.onNodeWithTag("upgrade-netzwerk").performClick()
 
         assertTrue(viewModel.state.hasUpgrade("netzwerk"))
-        compose.onNodeWithText("aktiv").assertIsDisplayed()
+        compose.onNodeWithText("hast du").assertIsDisplayed()
     }
 }
