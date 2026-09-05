@@ -80,7 +80,11 @@ fun GameScreen(viewModel: GameViewModel) {
 @Composable
 private fun RunningGame(viewModel: GameViewModel, state: GameState) {
     val snackbarHost = remember { SnackbarHostState() }
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var chosenTab by rememberSaveable { mutableIntStateOf(0) }
+
+    // Während des Tutorials bestimmt der Schritt, was zu sehen ist.
+    val step = viewModel.tutorialStep?.let { Tutorial.steps[it] }
+    val tab = step?.tab ?: chosenTab
 
     viewModel.message?.let { message ->
         LaunchedEffect(message) {
@@ -107,7 +111,15 @@ private fun RunningGame(viewModel: GameViewModel, state: GameState) {
                         )
                     }
                 },
-                actions = { ActionPointDots(state.actionPoints) },
+                actions = {
+                    ActionPointDots(state.actionPoints)
+                    TextButton(
+                        onClick = viewModel::restartTutorial,
+                        modifier = Modifier.testTag("help"),
+                    ) {
+                        Text("?", fontWeight = FontWeight.Bold)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -123,19 +135,25 @@ private fun RunningGame(viewModel: GameViewModel, state: GameState) {
             TabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.background) {
                 Tab(
                     selected = tab == 0,
-                    onClick = { tab = 0 },
+                    onClick = { chosenTab = 0 },
                     text = { Text("Kosten") },
                     modifier = Modifier.testTag("tab-kosten"),
                 )
                 Tab(
                     selected = tab == 1,
-                    onClick = { tab = 1 },
+                    onClick = { chosenTab = 1 },
                     text = { Text("Anlagen") },
                     modifier = Modifier.testTag("tab-anlagen"),
                 )
                 Tab(
                     selected = tab == 2,
-                    onClick = { tab = 2 },
+                    onClick = { chosenTab = 2 },
+                    text = { Text("Ausbau") },
+                    modifier = Modifier.testTag("tab-ausbau"),
+                )
+                Tab(
+                    selected = tab == 3,
+                    onClick = { chosenTab = 3 },
                     text = { Text("Verlauf") },
                     modifier = Modifier.testTag("tab-verlauf"),
                 )
@@ -148,10 +166,25 @@ private fun RunningGame(viewModel: GameViewModel, state: GameState) {
                     onNegotiate = viewModel::negotiate,
                     onSideGig = viewModel::sideGig,
                 )
-                1 -> AssetList(state = state, onBuy = viewModel::buyAsset)
+                1 -> AssetList(
+                    state = state,
+                    onBuy = viewModel::buyAsset,
+                    onSell = viewModel::sellAsset,
+                )
+                2 -> UpgradeList(state = state, onBuy = viewModel::buyUpgrade)
                 else -> LogList(state.log)
             }
         }
+    }
+
+    if (step != null) {
+        TutorialOverlay(
+            step = step,
+            index = viewModel.tutorialStep ?: 0,
+            total = Tutorial.steps.size,
+            onNext = viewModel::nextTutorialStep,
+            onSkip = viewModel::skipTutorial,
+        )
     }
 }
 
@@ -409,7 +442,7 @@ private fun DrainCard(
 }
 
 @Composable
-private fun AssetList(state: GameState, onBuy: (String) -> Unit) {
+private fun AssetList(state: GameState, onBuy: (String) -> Unit, onSell: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.testTag("asset-list"),
         contentPadding = PaddingValues(16.dp),
@@ -423,13 +456,25 @@ private fun AssetList(state: GameState, onBuy: (String) -> Unit) {
             )
         }
         items(state.assets, key = { it.id }) { asset ->
-            AssetCard(asset = asset, cash = state.cash, onBuy = { onBuy(asset.id) })
+            AssetCard(
+                asset = asset,
+                cash = state.cash,
+                yieldMultiplier = state.yieldMultiplier,
+                onBuy = { onBuy(asset.id) },
+                onSell = { onSell(asset.id) },
+            )
         }
     }
 }
 
 @Composable
-private fun AssetCard(asset: Asset, cash: Long, onBuy: () -> Unit) {
+private fun AssetCard(
+    asset: Asset,
+    cash: Long,
+    yieldMultiplier: Double,
+    onBuy: () -> Unit,
+    onSell: () -> Unit,
+) {
     val affordable = cash >= asset.nextPrice
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -454,7 +499,7 @@ private fun AssetCard(asset: Asset, cash: Long, onBuy: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    "Rendite ${asset.dailyYield.asPercent()}/Tag",
+                    "Rendite ${(asset.dailyYield * yieldMultiplier).asPercent()}/Tag",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -469,21 +514,91 @@ private fun AssetCard(asset: Asset, cash: Long, onBuy: () -> Unit) {
                 )
             }
 
+            Text(
+                if (asset.sellRate >= 1.0) {
+                    "Verkauf: voll auszahlbar"
+                } else {
+                    "Verkauf: nur ${(asset.sellRate * 100).format1()} % zurück"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             if (asset.owned > 0) {
                 Text(
-                    "bringt aktuell ${asset.dailyIncome().asEuro()}/Tag",
+                    "bringt aktuell ${(asset.dailyIncome() * yieldMultiplier).toLong().asEuro()}/Tag",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 
             Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = onBuy,
-                enabled = affordable,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Kaufen für ${asset.nextPrice.asEuro()}")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onBuy,
+                    enabled = affordable,
+                    modifier = Modifier.weight(1f).testTag("buy-${asset.id}"),
+                ) {
+                    Text("Kaufen ${asset.nextPrice.asEuro()}", fontSize = 12.sp)
+                }
+                if (asset.owned > 0) {
+                    OutlinedButton(
+                        onClick = onSell,
+                        modifier = Modifier.weight(1f).testTag("sell-${asset.id}"),
+                    ) {
+                        Text("Verkaufen ${asset.sellValue.asEuro()}", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpgradeList(state: GameState, onBuy: (String) -> Unit) {
+    LazyColumn(
+        modifier = Modifier.testTag("upgrade-list"),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Text(
+                "Ausbauten bringen keine Rendite — sie ändern die Regeln. " +
+                    "Dasselbe Geld könnte auch als Anlage arbeiten.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        items(state.upgrades, key = { it.id }) { upgrade ->
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(14.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(upgrade.name, fontWeight = FontWeight.SemiBold)
+                        if (upgrade.owned) {
+                            Text(
+                                "aktiv",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                    Text(
+                        upgrade.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (!upgrade.owned) {
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = { onBuy(upgrade.id) },
+                            enabled = state.cash >= upgrade.price,
+                            modifier = Modifier.fillMaxWidth().testTag("upgrade-${upgrade.id}"),
+                        ) {
+                            Text("Kaufen für ${upgrade.price.asEuro()}")
+                        }
+                    }
+                }
             }
         }
     }
@@ -644,6 +759,59 @@ private fun GameOverScreen(state: GameState, onRestart: () -> Unit) {
                 shape = RoundedCornerShape(14.dp),
             ) {
                 Text("Nochmal", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/**
+ * Legt sich über das laufende Spiel und erklärt Schritt für Schritt. Der
+ * Hintergrund bleibt sichtbar, weil der Text sich auf genau das bezieht, was
+ * darunter zu sehen ist.
+ */
+@Composable
+private fun TutorialOverlay(
+    step: TutorialStep,
+    index: Int,
+    total: Int,
+    onNext: () -> Unit,
+    onSkip: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.72f))
+            .padding(24.dp),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("tutorial-card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Text(
+                    "Schritt ${index + 1} von $total",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(step.title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text(step.body, style = MaterialTheme.typography.bodyMedium)
+
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onSkip, modifier = Modifier.testTag("tutorial-skip")) {
+                        Text("Überspringen")
+                    }
+                    Button(onClick = onNext, modifier = Modifier.testTag("tutorial-next")) {
+                        Text(if (index + 1 >= total) "Los geht's" else "Weiter")
+                    }
+                }
             }
         }
     }

@@ -55,7 +55,12 @@ object GameEngine {
         if (state.actionPoints < 1) return Outcome.Rejected("Keine Aktionen mehr heute.")
 
         val spent = state.copy(actionPoints = state.actionPoints - 1)
-        if (rng.nextDouble() > drain.negotiationChance) {
+        val chance = if (state.hasUpgrade("netzwerk")) {
+            (drain.negotiationChance + 0.25).coerceAtMost(0.95)
+        } else {
+            drain.negotiationChance
+        }
+        if (rng.nextDouble() > chance) {
             return Outcome.Ok(
                 spent.copy(
                     drains = spent.drains.map { if (it.id == drainId) it.bumpNegotiations() else it },
@@ -132,6 +137,59 @@ object GameEngine {
     }
 
     /**
+     * Anteil zu Geld machen. Kostet keine Aktion, aber je nach Anlage bleibt ein
+     * ordentlicher Teil auf der Strecke — der einzige Weg, aus einer Liquiditäts-
+     * klemme zu kommen, und deshalb eine Entscheidung mit Preisschild.
+     */
+    fun sellAsset(state: GameState, assetId: String): Outcome {
+        val asset = state.assets.find { it.id == assetId }
+            ?: return Outcome.Rejected("Anlage unbekannt.")
+        if (asset.owned == 0) return Outcome.Rejected("Davon besitzt du nichts.")
+
+        val payout = asset.sellValue
+        val sold = asset.copy(owned = asset.owned - 1)
+        val note = if (asset.sellRate < 1.0) {
+            " (${((1 - asset.sellRate) * 100).format1()} % Verlust)"
+        } else {
+            ""
+        }
+
+        return Outcome.Ok(
+            state.copy(
+                cash = state.cash + payout,
+                assets = state.assets.map { if (it.id == assetId) sold else it },
+                log = state.log + LogEntry(
+                    state.day,
+                    "${asset.name} verkauft für ${payout.asEuro()}$note.",
+                    LogEntry.Tone.NEUTRAL,
+                ),
+            )
+        )
+    }
+
+    /** Dauerhaften Ausbau kaufen. Bringt keine Rendite, sondern ändert eine Regel. */
+    fun buyUpgrade(state: GameState, upgradeId: String): Outcome {
+        val upgrade = state.upgrades.find { it.id == upgradeId }
+            ?: return Outcome.Rejected("Ausbau unbekannt.")
+        if (upgrade.owned) return Outcome.Rejected("Hast du schon.")
+        if (state.cash < upgrade.price) return Outcome.Rejected("Dafür fehlt dir Geld.")
+
+        val bought = state.copy(
+            cash = state.cash - upgrade.price,
+            upgrades = state.upgrades.map { if (it.id == upgradeId) it.copy(owned = true) else it },
+            log = state.log + LogEntry(
+                state.day,
+                "${upgrade.name} gekauft: ${upgrade.description}",
+                LogEntry.Tone.GOOD,
+            ),
+        )
+        // Die Assistenz soll noch am Tag des Kaufs helfen.
+        return Outcome.Ok(
+            if (upgradeId == "assistenz") bought.copy(actionPoints = bought.actionPoints + 1) else bought
+        )
+    }
+
+    /**
      * Notnagel: zählt als Einnahme für heute, wenn das Tagesziel sonst nicht zu
      * schaffen ist. Wirkt nur einen Tag — als Dauerlösung taugt er nicht.
      */
@@ -166,7 +224,7 @@ object GameEngine {
         val fixed = state.fixedCost
         val net = gross - taxes - fixed
         val cashAfter = state.cash + net
-        val worthAfter = cashAfter + state.investedValue
+        val worthAfter = cashAfter + state.investedValue + state.upgradeValue
         val broke = cashAfter < 0
         val survived = worthAfter >= state.goal && !broke
 
@@ -201,9 +259,10 @@ object GameEngine {
             day = state.day + 1,
             cash = cashAfter,
             goal = Balancing.goalForNextDay(state.goal, state.day),
-            actionPoints = Balancing.ACTION_POINTS_PER_DAY,
+            actionPoints = Balancing.ACTION_POINTS_PER_DAY +
+                if (state.hasUpgrade("assistenz")) 1 else 0,
             bonusIncome = 0,
-            drains = state.drains.map { it.advanceDay() },
+            drains = state.drains.map { it.advanceDay(state.hasUpgrade("steuerberater")) },
             bestDay = maxOf(state.bestDay, state.day + 1),
             log = state.log + LogEntry(
                 state.day,
@@ -227,9 +286,11 @@ object GameEngine {
         var total = state.passiveIncome + state.bonusIncome
         for (asset in state.assets) {
             if (asset.owned == 0) continue
-            val income = asset.dailyIncome()
+            val income = (asset.dailyIncome() * state.yieldMultiplier).toLong()
+            val cushion = if (state.hasUpgrade("notgroschen")) 0.5 else 1.0
             total += if (rng.nextDouble() < asset.risk) {
-                -(income * (Balancing.RISK_LOSS_MIN + rng.nextDouble() * Balancing.RISK_LOSS_SPAN)).toLong()
+                -(income * cushion *
+                    (Balancing.RISK_LOSS_MIN + rng.nextDouble() * Balancing.RISK_LOSS_SPAN)).toLong()
             } else {
                 income
             }
@@ -244,9 +305,10 @@ object GameEngine {
      * Verhandlungswiderstand kühlt wieder ab — sonst wäre nach drei Versuchen
      * für immer Schluss.
      */
-    private fun Drain.advanceDay(): Drain = copy(
+    private fun Drain.advanceDay(taxAdvisor: Boolean): Drain = copy(
         incomeRate = if (isTax) {
-            (incomeRate + Balancing.TAX_CREEP_PER_DAY).coerceAtMost(Balancing.MAX_TAX_RATE)
+            val creep = if (taxAdvisor) Balancing.TAX_CREEP_PER_DAY / 2 else Balancing.TAX_CREEP_PER_DAY
+            (incomeRate + creep).coerceAtMost(Balancing.MAX_TAX_RATE)
         } else {
             incomeRate
         },

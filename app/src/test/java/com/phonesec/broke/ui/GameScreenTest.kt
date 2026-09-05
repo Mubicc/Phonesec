@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.phonesec.broke.game.GameStatus
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -26,8 +28,8 @@ class GameScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun launch(): GameViewModel {
-        val viewModel = GameViewModel()
+    private fun launch(tutorialSeen: Boolean = true): GameViewModel {
+        val viewModel = GameViewModel(tutorialSeen = tutorialSeen)
         compose.setContent { BrokeTheme { GameScreen(viewModel) } }
         return viewModel
     }
@@ -92,5 +94,63 @@ class GameScreenTest {
         compose.onNodeWithText("BROKE").assertIsDisplayed()
         compose.onNodeWithText("Nochmal").performClick()
         compose.onNodeWithText("Tag 1").assertIsDisplayed()
+    }
+
+    @Test
+    fun tutorial_startet_beim_ersten_mal_und_fuehrt_durch() {
+        val viewModel = launch(tutorialSeen = false)
+
+        compose.onNodeWithTag("tutorial-card").assertIsDisplayed()
+        compose.onNodeWithText("Worum es geht").assertIsDisplayed()
+
+        compose.onNodeWithTag("tutorial-next").performClick()
+        compose.onNodeWithText("Das Tagesziel").assertIsDisplayed()
+
+        // Ab dem Anlagen-Schritt muss auch der passende Tab zu sehen sein.
+        while (viewModel.tutorialStep != null &&
+            Tutorial.steps[viewModel.tutorialStep!!].title != "Anlagen"
+        ) {
+            compose.onNodeWithTag("tutorial-next").performClick()
+        }
+        compose.onNodeWithText("Tagesgeldkonto").assertIsDisplayed()
+    }
+
+    @Test
+    fun tutorial_laesst_sich_ueberspringen_und_wieder_oeffnen() {
+        val viewModel = launch(tutorialSeen = false)
+
+        compose.onNodeWithTag("tutorial-skip").performClick()
+        assertNull(viewModel.tutorialStep)
+        compose.onAllNodesWithText("Worum es geht").assertCountEquals(0)
+
+        compose.onNodeWithTag("help").performClick()
+        compose.onNodeWithText("Worum es geht").assertIsDisplayed()
+    }
+
+    @Test
+    fun anlage_kaufen_und_wieder_verkaufen() {
+        val viewModel = launch()
+        compose.onNodeWithTag("tab-anlagen").performClick()
+
+        val cashBefore = viewModel.state.cash
+        compose.onNodeWithTag("buy-tagesgeld").performClick()
+        assertTrue(viewModel.state.cash < cashBefore)
+        assertEquals(1, viewModel.state.assets.first { it.id == "tagesgeld" }.owned)
+
+        compose.onNodeWithTag("sell-tagesgeld").performClick()
+        assertEquals(0, viewModel.state.assets.first { it.id == "tagesgeld" }.owned)
+        assertEquals("Tagesgeld ist voll liquide", cashBefore, viewModel.state.cash)
+    }
+
+    @Test
+    fun ausbau_tab_zeigt_und_kauft_ausbauten() {
+        val viewModel = launch()
+        compose.onNodeWithTag("tab-ausbau").performClick()
+
+        compose.onNodeWithText("Netzwerk").assertIsDisplayed()
+        compose.onNodeWithTag("upgrade-netzwerk").performClick()
+
+        assertTrue(viewModel.state.hasUpgrade("netzwerk"))
+        compose.onNodeWithText("aktiv").assertIsDisplayed()
     }
 }

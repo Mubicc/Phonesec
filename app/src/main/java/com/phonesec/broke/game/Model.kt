@@ -41,6 +41,10 @@ data class Drain(
 /**
  * Eine Anlage, die für dich arbeitet. Der Preis steigt mit jedem Kauf, damit
  * sich eine einzelne Anlage nicht endlos hochstapeln lässt.
+ *
+ * @param sellRate Anteil des Kaufpreises, den ein Verkauf zurückbringt. Genau
+ *   hier liegt die Abwägung: Die Anlagen mit der besten Rendite sind die, aus
+ *   denen du am teuersten wieder rauskommst.
  */
 data class Asset(
     val id: String,
@@ -49,25 +53,46 @@ data class Asset(
     val basePrice: Cents,
     val dailyYield: Double,
     val risk: Double,
+    val sellRate: Double,
     val owned: Int = 0,
 ) {
-    val nextPrice: Cents get() = (basePrice * Math.pow(PRICE_GROWTH, owned.toDouble())).toLong()
+    val nextPrice: Cents get() = priceOfUnit(owned)
+
+    /** Was der zuletzt gekaufte Anteil beim Verkauf einbringt. */
+    val sellValue: Cents
+        get() = if (owned == 0) 0 else (priceOfUnit(owned - 1) * sellRate).toLong()
 
     /** Summe, die insgesamt in dieser Anlage steckt — zählt zu deinem Vermögen. */
     fun investedValue(): Cents {
         var total = 0L
         for (i in 0 until owned) {
-            total += (basePrice * Math.pow(PRICE_GROWTH, i.toDouble())).toLong()
+            total += priceOfUnit(i)
         }
         return total
     }
 
     fun dailyIncome(): Cents = (investedValue() * dailyYield).toLong()
 
+    private fun priceOfUnit(index: Int): Cents =
+        (basePrice * Math.pow(PRICE_GROWTH, index.toDouble())).toLong()
+
     companion object {
         const val PRICE_GROWTH = 1.35
     }
 }
+
+/**
+ * Ein dauerhafter Ausbau. Er behält seinen Wert und zählt weiter zum Vermögen —
+ * sein Preis ist also nicht das Geld selbst, sondern die Rendite, die dasselbe
+ * Geld als Anlage gebracht hätte. Genau das ist die Abwägung.
+ */
+data class Upgrade(
+    val id: String,
+    val name: String,
+    val description: String,
+    val price: Cents,
+    val owned: Boolean = false,
+)
 
 enum class GameStatus { RUNNING, LOST }
 
@@ -91,6 +116,7 @@ data class GameState(
     val baseInterest: Double,
     val drains: List<Drain>,
     val assets: List<Asset>,
+    val upgrades: List<Upgrade> = emptyList(),
     val bonusIncome: Cents = 0,
     val log: List<LogEntry> = emptyList(),
     val status: GameStatus = GameStatus.RUNNING,
@@ -100,7 +126,10 @@ data class GameState(
 
     val passiveIncome: Cents get() = (cash * baseInterest).toLong().coerceAtLeast(0)
 
-    val assetIncome: Cents get() = assets.sumOf { it.dailyIncome() }
+    /** Die Depot-Optimierung hebt den Ertrag aller Anlagen gleichermaßen. */
+    val yieldMultiplier: Double get() = if (hasUpgrade("depot")) 1.15 else 1.0
+
+    val assetIncome: Cents get() = (assets.sumOf { it.dailyIncome() } * yieldMultiplier).toLong()
 
     val taxCost: Cents get() = drains.filter { it.isTax }.sumOf { it.costFor(grossIncome) }
 
@@ -110,10 +139,15 @@ data class GameState(
 
     val netIncome: Cents get() = grossIncome - totalDrain
 
+    fun hasUpgrade(id: String): Boolean = upgrades.any { it.id == id && it.owned }
+
     /** Was in Anlagen steckt. Zählt zum Vermögen, ist aber nicht liquide. */
     val investedValue: Cents get() = assets.sumOf { it.investedValue() }
 
-    val netWorth: Cents get() = cash + investedValue
+    /** Gekaufte Ausbauten behalten ihren Wert, werfen aber nichts ab. */
+    val upgradeValue: Cents get() = upgrades.filter { it.owned }.sumOf { it.price }
+
+    val netWorth: Cents get() = cash + investedValue + upgradeValue
 
     /** Kontostand am Abend, wenn du ab jetzt nichts mehr tust. */
     val projectedCash: Cents get() = cash + netIncome

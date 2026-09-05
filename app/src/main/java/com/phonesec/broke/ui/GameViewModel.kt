@@ -11,7 +11,9 @@ import kotlin.random.Random
 
 class GameViewModel(
     initialBestDay: Int = 1,
+    tutorialSeen: Boolean = true,
     private val onBestDay: (Int) -> Unit = {},
+    private val onTutorialDone: () -> Unit = {},
 ) : ViewModel() {
 
     private val rng = Random(System.currentTimeMillis())
@@ -27,11 +29,38 @@ class GameViewModel(
     var message by mutableStateOf<String?>(null)
         private set
 
+    /** Schritt des Tutorials, oder null wenn es gerade nicht läuft. */
+    var tutorialStep by mutableStateOf<Int?>(if (tutorialSeen) null else 0)
+        private set
+
+    fun nextTutorialStep() {
+        val current = tutorialStep ?: return
+        tutorialStep = if (current + 1 >= Tutorial.steps.size) {
+            onTutorialDone()
+            null
+        } else {
+            current + 1
+        }
+    }
+
+    fun skipTutorial() {
+        tutorialStep = null
+        onTutorialDone()
+    }
+
+    fun restartTutorial() {
+        tutorialStep = 0
+    }
+
     fun cancelDrain(id: String) = apply(GameEngine.cancel(state, id))
 
     fun negotiate(id: String) = apply(GameEngine.negotiate(state, id, rng))
 
     fun buyAsset(id: String) = apply(GameEngine.buyAsset(state, id))
+
+    fun sellAsset(id: String) = apply(GameEngine.sellAsset(state, id))
+
+    fun buyUpgrade(id: String) = apply(GameEngine.buyUpgrade(state, id))
 
     fun sideGig() = apply(GameEngine.sideGig(state, rng))
 

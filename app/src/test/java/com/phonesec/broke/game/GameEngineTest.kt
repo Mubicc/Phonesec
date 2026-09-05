@@ -219,4 +219,90 @@ class GameEngineTest {
         }
         assertEquals(GameStatus.LOST, state.status)
     }
+
+    // -------------------------------------------------- Verkaufen und Ausbauten
+
+    @Test
+    fun `verkaufen bringt geld zurueck und kostet keine aktion`() {
+        val start = ok(GameEngine.buyAsset(GameEngine.newGame(), "tagesgeld"))
+        val price = start.assets.first { it.id == "tagesgeld" }.investedValue()
+
+        val after = ok(GameEngine.sellAsset(start, "tagesgeld"))
+
+        assertEquals(0, after.assets.first { it.id == "tagesgeld" }.owned)
+        assertEquals("Tagesgeld ist voll liquide", start.cash + price, after.cash)
+        assertEquals(start.actionPoints, after.actionPoints)
+    }
+
+    @Test
+    fun `illiquide anlagen kosten beim verkauf einen teil des einsatzes`() {
+        val rich = GameEngine.newGame().copy(cash = 5_000_000L)
+        val bought = ok(GameEngine.buyAsset(rich, "immo"))
+        val invested = bought.assets.first { it.id == "immo" }.investedValue()
+
+        val after = ok(GameEngine.sellAsset(bought, "immo"))
+
+        val payout = after.cash - bought.cash
+        assertTrue("Rückzahlung muss unter dem Einsatz liegen", payout < invested)
+        assertTrue("Aber nicht wertlos", payout > invested / 2)
+    }
+
+    @Test
+    fun `was man nicht besitzt kann man nicht verkaufen`() {
+        assertTrue(rejected(GameEngine.sellAsset(GameEngine.newGame(), "krypto")).contains("nichts"))
+    }
+
+    @Test
+    fun `ausbau kostet geld und laesst sich nur einmal kaufen`() {
+        val rich = GameEngine.newGame().copy(cash = 2_000_000L)
+        val price = rich.upgrades.first { it.id == "netzwerk" }.price
+
+        val after = ok(GameEngine.buyUpgrade(rich, "netzwerk"))
+
+        assertEquals(rich.cash - price, after.cash)
+        assertTrue(after.hasUpgrade("netzwerk"))
+        assertTrue(rejected(GameEngine.buyUpgrade(after, "netzwerk")).contains("schon"))
+    }
+
+    @Test
+    fun `assistenz gibt ab sofort eine aktion mehr`() {
+        val rich = GameEngine.newGame().copy(cash = 2_000_000L)
+
+        val after = ok(GameEngine.buyUpgrade(rich, "assistenz"))
+        assertEquals(rich.actionPoints + 1, after.actionPoints)
+
+        val nextDay = GameEngine.endDay(after, Random(4)).first
+        assertEquals(Balancing.ACTION_POINTS_PER_DAY + 1, nextDay.actionPoints)
+    }
+
+    @Test
+    fun `steuerberater bremst den taeglichen steueranstieg`() {
+        val plain = GameEngine.newGame().copy(cash = 2_000_000L)
+        val advised = ok(GameEngine.buyUpgrade(plain, "steuerberater"))
+
+        val plainRate = GameEngine.endDay(plain, Random(9)).first
+            .drains.first { it.isTax }.incomeRate
+        val advisedRate = GameEngine.endDay(advised, Random(9)).first
+            .drains.first { it.isTax }.incomeRate
+
+        assertTrue("Mit Berater darf die Steuer langsamer steigen", advisedRate < plainRate)
+    }
+
+    @Test
+    fun `netzwerk erhoeht die verhandlungschance`() {
+        // Ein Zufallswert, der ohne Netzwerk scheitert und mit Netzwerk trifft.
+        val plain = GameEngine.newGame().copy(cash = 2_000_000L)
+        val networked = ok(GameEngine.buyUpgrade(plain, "netzwerk"))
+        val before = plain.drains.first { it.id == "streaming" }.dailyCost
+
+        var plainWins = 0
+        var networkedWins = 0
+        repeat(200) { seed ->
+            val a = ok(GameEngine.negotiate(plain, "streaming", Random(seed.toLong())))
+            if (a.drains.first { it.id == "streaming" }.dailyCost < before) plainWins++
+            val b = ok(GameEngine.negotiate(networked, "streaming", Random(seed.toLong())))
+            if (b.drains.first { it.id == "streaming" }.dailyCost < before) networkedWins++
+        }
+        assertTrue("Netzwerk muss messbar helfen ($plainWins vs $networkedWins)", networkedWins > plainWins)
+    }
 }

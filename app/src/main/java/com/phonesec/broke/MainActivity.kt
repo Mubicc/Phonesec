@@ -18,6 +18,7 @@ import com.phonesec.broke.ui.GameViewModel
 
 private const val PREFS = "broke_prefs"
 private const val KEY_BEST_DAY = "best_day"
+private const val KEY_TUTORIAL_SEEN = "tutorial_seen"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,10 +34,14 @@ class MainActivity : ComponentActivity() {
                         initializer {
                             GameViewModel(
                                 initialBestDay = prefs.getInt(KEY_BEST_DAY, 1),
+                                tutorialSeen = prefs.getBoolean(KEY_TUTORIAL_SEEN, false),
                                 onBestDay = { day ->
                                     if (day > prefs.getInt(KEY_BEST_DAY, 1)) {
                                         prefs.edit().putInt(KEY_BEST_DAY, day).apply()
                                     }
+                                },
+                                onTutorialDone = {
+                                    prefs.edit().putBoolean(KEY_TUTORIAL_SEEN, true).apply()
                                 },
                             )
                         }

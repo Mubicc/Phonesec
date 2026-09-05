@@ -76,14 +76,20 @@ object Balancing {
         ),
     )
 
+    /**
+     * Rendite, Risiko und Liquidität ziehen bewusst gegeneinander: Was am besten
+     * verzinst, lässt sich am schlechtesten wieder zu Geld machen. Es gibt daher
+     * keine Anlage, die immer richtig ist.
+     */
     fun startingAssets(): List<Asset> = listOf(
         Asset(
             id = "tagesgeld",
             name = "Tagesgeldkonto",
-            description = "Langweilig, aber es liefert jeden Tag.",
+            description = "Magere Rendite, aber jederzeit voll auszahlbar.",
             basePrice = 50_000L,
             dailyYield = 0.065,
             risk = 0.0,
+            sellRate = 1.0,
         ),
         Asset(
             id = "etf",
@@ -92,22 +98,58 @@ object Balancing {
             basePrice = 150_000L,
             dailyYield = 0.12,
             risk = 0.15,
+            sellRate = 0.9,
         ),
         Asset(
             id = "krypto",
             name = "Krypto-Bag",
-            description = "Beste Rendite — und die wildesten Ausschläge.",
+            description = "Wilde Ausschläge. Beim Verkauf bleibt einiges liegen.",
             basePrice = 90_000L,
             dailyYield = 0.22,
             risk = 0.35,
+            sellRate = 0.7,
         ),
         Asset(
             id = "immo",
             name = "Eigentumswohnung",
-            description = "Starke Miete — bringt aber Grundsteuer mit.",
+            description = "Beste Rendite — aber Grundsteuer und schwer verkäuflich.",
             basePrice = 900_000L,
             dailyYield = 0.135,
             risk = 0.05,
+            sellRate = 0.55,
+        ),
+    )
+
+    fun startingUpgrades(): List<Upgrade> = listOf(
+        Upgrade(
+            id = "steuerberater",
+            name = "Steuerberater",
+            description = "Halbiert den täglichen Anstieg deines Steuersatzes.",
+            price = 400_000L,
+        ),
+        Upgrade(
+            id = "assistenz",
+            name = "Assistenz",
+            description = "Eine zusätzliche Aktion an jedem Tag.",
+            price = 900_000L,
+        ),
+        Upgrade(
+            id = "notgroschen",
+            name = "Risikopuffer",
+            description = "Rote Tage kosten dich nur noch die Hälfte.",
+            price = 650_000L,
+        ),
+        Upgrade(
+            id = "netzwerk",
+            name = "Netzwerk",
+            description = "Verhandlungen gelingen deutlich häufiger.",
+            price = 300_000L,
+        ),
+        Upgrade(
+            id = "depot",
+            name = "Depot-Optimierung",
+            description = "Alle Anlagen werfen 15 % mehr ab.",
+            price = 1_500_000L,
         ),
     )
 
@@ -119,6 +161,7 @@ object Balancing {
         baseInterest = START_INTEREST,
         drains = startingDrains(),
         assets = startingAssets(),
+        upgrades = startingUpgrades(),
         log = listOf(
             LogEntry(1, "Tag 1. Erreiche das Tagesziel oder du bist raus.", LogEntry.Tone.NEUTRAL),
         ),
