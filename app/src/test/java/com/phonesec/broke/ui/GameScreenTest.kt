@@ -2,13 +2,11 @@ package com.phonesec.broke.ui
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.phonesec.broke.game.GameStatus
 import org.junit.Assert.assertTrue
@@ -17,8 +15,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
+/**
+ * Das Fenster ist bewusst sehr hoch, damit die Listen vollständig rendern:
+ * performScrollToNode kommt unter Robolectric nicht zur Ruhe und blockiert.
+ */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [34])
+@Config(sdk = [34], qualifiers = "w411dp-h2400dp")
 class GameScreenTest {
 
     @get:Rule
@@ -36,11 +38,7 @@ class GameScreenTest {
 
         compose.onNodeWithText("Tag 1").assertIsDisplayed()
         compose.onNodeWithText("Vermögen").assertIsDisplayed()
-
-        compose.onNodeWithTag("drain-list").performScrollToNode(hasText("WG-Zimmer"))
         compose.onNodeWithText("WG-Zimmer").assertIsDisplayed()
-
-        compose.onNodeWithTag("drain-list").performScrollToNode(hasText("Einkommensteuer"))
         compose.onNodeWithText("Einkommensteuer").assertIsDisplayed()
     }
 
@@ -48,7 +46,6 @@ class GameScreenTest {
     fun kuendigen_entfernt_das_abo_aus_der_liste() {
         launch()
 
-        compose.onNodeWithTag("drain-list").performScrollToNode(hasText("Nutflix Premium"))
         compose.onAllNodesWithText("Nutflix Premium").assertCountEquals(1)
 
         compose.onNodeWithTag("cancel-streaming").performClick()
@@ -73,10 +70,7 @@ class GameScreenTest {
 
         compose.onNodeWithTag("tab-anlagen").performClick()
 
-        compose.onNodeWithTag("asset-list").performScrollToNode(hasText("Tagesgeldkonto"))
         compose.onNodeWithText("Tagesgeldkonto").assertIsDisplayed()
-
-        compose.onNodeWithTag("asset-list").performScrollToNode(hasText("Krypto-Bag"))
         compose.onNodeWithText("Krypto-Bag").assertIsDisplayed()
     }
 
@@ -84,8 +78,7 @@ class GameScreenTest {
     fun wer_nur_tage_abschliesst_landet_im_broke_screen() {
         val viewModel = launch()
 
-        // Passives Durchklicken verliert nach wenigen Tagen — genau das prüfen wir.
-        repeat(40) {
+        repeat(25) {
             if (viewModel.state.status != GameStatus.RUNNING) return@repeat
             compose.onNodeWithTag("end-day").performClick()
             val weiter = compose.onAllNodesWithText("Weiter")
@@ -93,7 +86,7 @@ class GameScreenTest {
         }
 
         assertTrue(
-            "Nichtstun muss innerhalb von 40 Tagen scheitern",
+            "Nichtstun muss innerhalb von 25 Tagen scheitern",
             viewModel.state.status != GameStatus.RUNNING,
         )
         compose.onNodeWithText("BROKE").assertIsDisplayed()
